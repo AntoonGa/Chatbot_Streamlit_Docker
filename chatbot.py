@@ -15,15 +15,10 @@ import openai
 import os
 main_path = './'
 keys_path = os.path.join(main_path, 'openia_config.txt')
-
-# Set API keys for cvRanker and chunkNorris
 keys_file = open(keys_path)
 lines = keys_file.readlines()
 keys_file.close()
-# os.environ["OPENAI_API_TYPE"] = lines[0].split("=")[1].strip()
-# os.environ["OPENAI_API_BASE"] = lines[1].split("=")[1].strip()
-# os.environ["OPENAI_API_VERSION"] = lines[2].split("=")[1].strip()
-# os.environ["OPENAI_API_KEY"] = lines[3].split("=")[1].strip()
+# Set API keys
 openai.api_type = lines[0].split("=")[1].strip()
 openai.api_base = lines[1].split("=")[1].strip()
 openai.api_version = lines[2].split("=")[1].strip()
@@ -120,10 +115,7 @@ class llm():
 
         print(engine)
         return engine
-    
-            
-        
-        
+
 
     def _set_system_function(self):
         """
