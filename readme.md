@@ -72,4 +72,4 @@ This project is licensed under the MIT License.
 - add an internet-search agent
 - add a document-search agent (any format, chroma/langchain vector similarity search)
 - dynamic memory must be handled using a similarity search such as to drop irrelevent parts of the history
-  
+- the streamlit text-input area must be cleared after the input is sent
