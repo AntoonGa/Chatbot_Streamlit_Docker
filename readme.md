@@ -70,9 +70,17 @@ This project is licensed under the MIT License.
 
 ## TDL
 - factorize streamlit code in object.
-- enable streaming mode to streamlit
+
+- Done: enable streaming mode to streamlit
+
 - enable changing llm on the fly (All Azure Models are currently okay, add one from AWS - Hugging Face and a local llm)
+
 - add an internet-search agent
-- add a document-search agent (any format, chroma/langchain vector similarity search)
+
+- add a document-search agent (any format, using chroma/langchain vector similarity search)
+
 - dynamic memory must be handled using a similarity search such as to drop irrelevent parts of the history
+
 - the streamlit text-input area must be cleared after the input is sent
+
+- run some codeprofiler test and speedup execution
