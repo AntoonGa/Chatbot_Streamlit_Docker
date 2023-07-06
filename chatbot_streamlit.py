@@ -87,7 +87,10 @@ class llm():
             # send full history has payload
             payload = self.history
             # send history to llm and get response
-            response = self._send_payload_stream_answer(payload)
+            response = ''
+            for yielded in self._send_payload_stream_answer(payload):
+                response = response + yielded
+                yield yielded
             # append history with system message
             self._append_history(role="assistant", content=response)
         return response
@@ -250,7 +253,6 @@ class llm():
             str: The response from the OpenAI API.
         """
         time.sleep(0.5)
-        response = ''
         # we make multiple tries with a 10second timeout
         is_to_do = 1  # break condition 1
         try_counter = 0  # break contition 2: will break if number of attempts is 5
@@ -266,7 +268,7 @@ class llm():
                     content = chunk["choices"][0].get("delta", {}).get("content")
                     if content is not None:
                         print(content, end='')
-                        response = response + content
+                        yield content
 
                 is_to_do = 0
 
@@ -276,7 +278,7 @@ class llm():
                 try_counter += 1
                 time.sleep(1)
 
-        return response
+        return
 
     def _pop_history(self):
         """
@@ -318,15 +320,11 @@ def main():
     chatbot.send_receive_message()
 
     query = "What's the fastest between pandas and spark"
-    chatbot.send_receive_message(query)
+    response = ''
+    for yielded in chatbot.send_receive_message(query):
+        response = response + yielded
 
-    query = "What was the subject of my question ?"
-    chatbot.send_receive_message(query)
-
-    chatbot.flush_history()
-    query = "What was the subject of my question ?"
-    chatbot.send_receive_message(query)
-
-
+    print('\n--\n')
+    print(response)
 if __name__ == "__main__":
     main()

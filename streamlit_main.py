@@ -3,7 +3,7 @@ from streamlit_chat import message
 from streamlit_extras.colored_header import colored_header
 from streamlit_extras.add_vertical_space import add_vertical_space
 
-import chatbot_streamlit
+import chatbot_streamlit as chatbot_streamlit
 import textwrap
 
 
@@ -26,10 +26,33 @@ def flush_conversation():
     return
 
 
+# def wrap_code(code: str, width: int = 80) -> str:
+#     """
+#     Wrap long lines of code to the specified width.
+
+#     :param code: The code string to wrap.
+#     :type code: str
+#     :param width: The maximum width of a line, defaults to 80.
+#     :type width: int, optional
+#     :return: The wrapped code string.
+#     :rtype: str
+#     """
+#     lines = code.split('\n')
+#     wrapped_lines = []
+
+#     for line in lines:
+#         stripped_line = line.lstrip()
+#         indent = len(line) - len(stripped_line)
+#         wrapped_line = textwrap.wrap(stripped_line, width=width - indent, break_long_words=False)
+#         wrapped_line = [f"{' ' * indent}{l}" if i ==
+#                         0 else f"{' ' * (indent + 4)}{l}" for i, l in enumerate(wrapped_line)]
+#         wrapped_lines.extend(wrapped_line)
+
+#     wrapped_code = '\n'.join(wrapped_lines)
+#     return wrapped_code
 def wrap_code(code: str, width: int = 80) -> str:
     """
     Wrap long lines of code to the specified width.
-
     :param code: The code string to wrap.
     :type code: str
     :param width: The maximum width of a line, defaults to 80.
@@ -37,9 +60,8 @@ def wrap_code(code: str, width: int = 80) -> str:
     :return: The wrapped code string.
     :rtype: str
     """
-    lines = code.split('\n')
+    lines = repr(code).split('\\n')
     wrapped_lines = []
-
     for line in lines:
         stripped_line = line.lstrip()
         indent = len(line) - len(stripped_line)
@@ -47,15 +69,14 @@ def wrap_code(code: str, width: int = 80) -> str:
         wrapped_line = [f"{' ' * indent}{l}" if i ==
                         0 else f"{' ' * (indent + 4)}{l}" for i, l in enumerate(wrapped_line)]
         wrapped_lines.extend(wrapped_line)
-
     wrapped_code = '\n'.join(wrapped_lines)
     return wrapped_code
 
 # Response output
 # Function for taking user prompt as input followed by producing AI generated responses
-def generate_response(prompt, chatbot):
-    response = st.session_state['chatbot'].send_receive_message(prompt)
-    return response
+def generate_response(prompt, chatbot):  
+    for yielded in st.session_state['chatbot'].send_receive_message(prompt):
+        yield yielded
 
 # User input
 # Function for taking user provided prompt as input
@@ -65,7 +86,6 @@ def get_text():
         return 
           
     input_text = st.text_area("Input", key="text")
-    
     st.button("clear text input", on_click=clear_text)
     st.write(input_text)
     
@@ -73,7 +93,7 @@ def get_text():
 
 
 # STREAMLIT HANDLING
-st.set_page_config(page_title="LLM Agent", layout="wide")
+st.set_page_config(page_title="LLM Agent", layout="wide", initial_sidebar_state  = "expanded")
 
 # machine state initalization
 if 'chatbot' not in st.session_state:
@@ -90,10 +110,10 @@ if 'past' not in st.session_state:
 if 'last_user_input' not in st.session_state:
     st.session_state['last_user_input'] = ''
 
+
 # Sidebar contents
 with st.sidebar:
-    st.title("🤗💬 Antoine llmAgent Features:")
-
+    st.title("🤗💬 Antoine chatbot Features:")
     add_vertical_space(2)
     option_engine = st.selectbox(
         'Engine',
@@ -130,22 +150,45 @@ with input_container:
 with response_container:
     # get response only if there is a user_input and if it was different that the last one.
     if user_input and user_input != st.session_state['last_user_input']:
+        # make sure we don't rerun the function if user_input has not changed
         st.session_state['last_user_input'] = user_input
-        response = generate_response(user_input, st.session_state['chatbot'])
         st.session_state.past.append(user_input)
-        st.session_state.generated.append(response)
+        
+        # horizontal line between chat sessions
+        st.markdown("<hr/>", unsafe_allow_html=True)
+        # this is where the streaming response will be appended
+        st.session_state.generated.append("")
+        # Create a single code_placeholder using st.empty()
+        code_placeholder = st.empty()
+        # stream the response
+        for yielded in generate_response(user_input, st.session_state['chatbot']):
+            st.session_state.generated[-1] = st.session_state.generated[-1] + yielded
+            if st.session_state.generated[-1]:          
+                try:
+                    # preprocess message answer (wrap text to fit box width and set indentation)
+                    wrap_generated = wrap_code(code=st.session_state["generated"][-1], width=80)
+                    # display message as code
+                    code_placeholder.code(wrap_generated, language='python', line_numbers =True)
+                except:
+                    pass
+        wrap_past = wrap_code(code=st.session_state['past'][-1], width=80)
+        # st.code(wrap_past, language='python')
+        st.text(wrap_past)
 
-    # display conversation in reverse order (to avoid scrolling)
-    if st.session_state['generated']:
-        for i in range(len(st.session_state['generated']),0,-1):
-            # do not display the first "useless" messages!
-            try:
-                # preprocess message answer (wrap text to fit box width and set indentation)
-                wrap_generated = wrap_code(code=st.session_state["generated"][i], width=100)
-                wrap_past = wrap_code(code=st.session_state['past'][i], width=100)
-                # display message as code
-                st.markdown("<hr/>", unsafe_allow_html=True)
-                st.code(wrap_generated, language='python')
-                st.code(wrap_past, language='python')
-            except:
-                pass
+        # display chathistory.
+        if len(st.session_state['generated']) > 2:
+            for i in range(len(st.session_state['generated'])-2,0,-1):
+                # do not display the first "useless" messages!
+                try:
+                    # preprocess message answer (wrap text to fit box width and set indentation)
+                    wrap_generated = wrap_code(code=st.session_state["generated"][i], width=80)
+                    wrap_past = wrap_code(code=st.session_state['past'][i], width=80)
+                    # display message as code
+                    st.markdown("<hr/>", unsafe_allow_html=True)
+                    st.code(wrap_generated, language='python', line_numbers =True)
+                    # st.code(wrap_past, language='python')
+                    st.text(wrap_past)
+
+                except:
+                    pass
+
