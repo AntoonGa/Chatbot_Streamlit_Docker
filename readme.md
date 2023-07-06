@@ -2,6 +2,9 @@
 
 A copilot chatbot with dynamic history management. The chatbot uses OpenAI's language models to provide responses to user queries. The history can be adjusted, flushed, or popped to manage the chatbot's memory.
 
+![BotRunningOnStreamLit](./ezgif-3-d6b1e5e52f.gif)
+
+
 ## Features
 
 - Initialize the chatbot with a specified language model engine and token limits
