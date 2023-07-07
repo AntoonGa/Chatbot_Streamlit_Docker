@@ -1,51 +1,68 @@
-# 1 LLM Chatbot
-
-A copilot chatbot with dynamic history management. The chatbot uses OpenAI's language models to provide responses to user queries. The history can be adjusted, flushed, or popped to manage the chatbot's memory.
-
+This repository contains a chatbot application built using Streamlit and
+    OpenAI\'s GPT models. The chatbot can be used for various purposes such as
+    coding assistance, commenting on code, and general conversation. The application
+    can be containerized using Docker.
+	
 ![BotRunningOnStreamLit](./ezgif-3-d6b1e5e52f.gif)
 
 
 ## Features
+- Streamlit-based chatbot interface
+- Support for GPT-4 and GPT-3 models
+- Customizable system functions (coder, commenter, chatbot, dummy)
+- Dynamic chat history management
+- Token management for efficient API usage
 
-- Initialize the chatbot with a specified language model engine and token limits
-- Automatic adjustment of chat history size to ensure it does not exceed the maximum token context
-- Flush the chat history, keeping only the initial system message
-- Remove the oldest question and answer from the chat history
-- Interact with the chatbot in a continuous loop
-- Change the system function or engine during the chat
-
-## Usage
-
-1. Set up the required environment variables for OpenAI API keys in the `openia_config.txt` file.
-2. Import the `llm` class and create a chatbot instance with the desired language model engine:
-
-```python
-from llm_chatbot import llm
-
-chatbot = llm(llm_engine="gpt-4-32k")
+## Installation
+1. Clone the repository and install the requierements.txt:
+2. Create openia_config.txt in the repo directory
+It should look like this:
 ```
-
-3. Start the chat with the chatbot:
-
-```python
-chatbot.chat()
+openai.api_type = azure
+openai.api_base = https://your-deployement.openai.azure.com/
+openai.api_version = 2023-03-15-preview
+openai.api_key = you-api-key
 ```
+2. Navigate to the directory:
+```
+cd path/personnal_chatbot
+```
+3. To run locally: streamlit run streamlit_app.py
 
-During the chat, you can use the following commands:
-
-- `exit`: Stop the chat
-- `flush`: Destroy the chat history, keeping the system function
-- `pop`: Remove the oldest question and answer from the chat history, keeping the system function
-- `system`: Destroy the chat history and reset the system function
-- `engine`: Change the language model engine, keeping the system function and chat history
-
+## Dockerization
+1. Build the Docker image:
+```
+docker build -t chatbot-streamlit .
+```
+2. Run the Docker container:
+```
+docker run -p 8501:8501 chatbot-streamlit
+```
+3. Open your browser and visit `http://localhost:8501` to access the chatbot
+    application.
+	
+## In-app Usage
+1. Select the desired engine (GPT-4 or GPT-3) and system function (coder,
+    commenter, chatbot, dummy) from the sidebar.
+2. Type your query or prompt in the input box and press Enter.
+3. The chatbot will generate a response based on the selected engine and system
+    function.
+4. You can clear the input box by clicking the "clear text input" button.
+5. To flush the chatbot\'s memory, click the "Flush memory" button in the
+    sidebar.
+## Files
+- `main.py`: The main Streamlit application file containing the chatbot
+    interface and logic.
+- `chatbot_streamlit.py`: The chatbot class implementation using OpenAI\'s GPT
+    models.
+- `Dockerfile`: The Dockerfile for containerizing the application.
 ## Dependencies
 
 - Python 3.6+
 - `tiktoken`
 - `openai`
 
-# 2 Streamlit LLM Chatbot
+# Streamlit LLM Chatbot
 ## Code Overview
 The code is organized into several functions and a Streamlit application layout.
 
@@ -53,34 +70,7 @@ The code is organized into several functions and a Streamlit application layout.
 The Streamlit application is organized into a sidebar and main content area. The sidebar contains
     options for selecting the chatbot's engine, system function, and a button to flush the chatbot's
     memory. The main content area displays the user input box and the conversation history.
-## Usage
-To run the Streamlit application, first install the required dependencies:
-```
-pip install streamlit streamlit_chat streamlit_extras
-```
-Then, run the Streamlit application:
-```
-streamlit run app.py
-```
-Open the provided URL in your browser to interact with the chatbot.
 
 ## License
 
 This project is licensed under the MIT License.
-
-## TDL
-- factorize streamlit code in object.
-
-- Done: enable streaming mode to streamlit
-
-- enable changing llm on the fly (All Azure Models are currently okay, add one from AWS - Hugging Face and a local llm)
-
-- add an internet-search agent
-
-- add a document-search agent (any format, using chroma/langchain vector similarity search)
-
-- dynamic memory must be handled using a similarity search such as to drop irrelevent parts of the history
-
-- the streamlit text-input area must be cleared after the input is sent
-
-- run some codeprofiler test and speedup execution
