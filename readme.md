@@ -71,6 +71,25 @@ The Streamlit application is organized into a sidebar and main content area. The
     options for selecting the chatbot's engine, system function, and a button to flush the chatbot's
     memory. The main content area displays the user input box and the conversation history.
 
+
+## Azure deployement on WebApp
+1. Create your docker image as indicated above.
+2. On your Azure Portal, create a container registry (e.g myContainerRegistry)
+3. On your local terminal login to your container registry:
+docker login myContainerRegistry.azurecr.io
+4. Push your local image to your container registry:
+docker tag myDockerImage myContainerRegistry.azurecr.io/myDockerImage
+docker push myContainerRegistry.azurecr.io/myDockerImage
+5. On your Azure Portal, create a Web App
+6. On your Web App go to deployement center and select:
+Container type : Single container
+Registry source : Azure container registry
+Registry* : myContainerRegistry
+Image* : myDockerImage
+Tag* : latest
+7. Save and start the Web App. The application should be running after a few minutes
+8. Access the chatbot through the overview on the Web App: @Default domain
+
 ## License
 
 This project is licensed under the MIT License.
