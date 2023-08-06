@@ -166,6 +166,16 @@ class llm():
         We will play a game you and me.
         You will be a very very stupid IA that believe stupid things.
         I will ask question and you will answer idiotic things. :)
+        """,
+        
+                            "Python copilot": """
+        You are a coding assistant for Python developpers. A Python co-pilot !
+        You are consice, precice and code at the highest level.
+        You use a wide variety of famous Python packages and libraries.
+        You provide codes with good comments and functions headers indicating the types of output and arguments.
+        When you provide code, make sur it is well delimited from your other sentenses.
+
+        You are provided the code below and the file sources to give you context. Use this context.
         """}
 
         if user_input in hardcoded_systems:
@@ -182,6 +192,7 @@ class llm():
             # of create the history if it does not exists.
             self.history = [role_system]
 
+        self.system_role = user_input
         print("System function:", self.system_function)
         return 
 
@@ -191,12 +202,95 @@ class llm():
         This function removes all elements from the chat history except the first one, which is the initial system message.
         """
         self.history = [self.history[0]]
+        print("FLUSHED HISTORY")
         return
-
-
-    ### internal use function ###
     
-    def _count_tokens(self, encoding_name="cl100k_base"):
+    def add_context_py_file(self, file_paths : list[str]):
+        """
+        Add the content of the specified Python files to the chatbot's system function context.
+
+        This function reads the content of the provided Python files and appends it to the system function context.
+        It ensures that the added context does not exceed the maximum token limit for the language model.
+
+        Parameters
+        ----------
+        file_paths : list[str]
+            A list of file paths to the Python files to be added to the context.
+
+        Returns
+        -------
+        None.
+
+        """
+        
+        if isinstance(file_paths, str): file_paths = [file_paths]
+        if not isinstance(file_paths, list): 
+            print("Please input a list of paths")
+            return
+        
+        # reset system function to python copilot
+        self.set_system_function(user_input="Python copilot")
+        
+        #template context
+        template_context = """\n##################################
+file path: {}
+-------------------------------
+file content:
+{}
+##################################
+"""
+        context_full = ''
+        
+        #templace file list
+        template_file_list =  """\n##################################\n#FILES LIST"""
+        
+
+        # create context
+        if file_paths:
+            context_string = ''
+            file_list_string = template_file_list
+            # add files one by one
+            for file_path in file_paths:
+                #load py file to string
+                py_string = self._read_py_file(file_path)
+                
+                if py_string:
+                    # add to context
+                    context_string = context_string + template_context.format(file_path, py_string)
+                    # add to file list
+                    file_list_string = file_list_string + "\n#" + file_path
+                
+            # generate context
+            context_full = file_list_string + "\n##################################\n"
+            context_full = context_full + context_string
+            
+                
+                
+                
+                
+        #check context_full fits in remaining tokens
+        tokens_in_history = self._count_tokens_in_history()
+        left_over_tokens = self.max_token_context - tokens_in_history
+        tokens_in_context_string = self._count_tokens_from_string(context_full)
+        
+        #append to system if it fits
+        if tokens_in_context_string < left_over_tokens and context_full:                 
+            # append system function
+            self.history[0]["content"] = self.history[0]["content"] + context_full
+            print("File successfully added to context")
+        elif tokens_in_context_string == 0 or not context_full:
+            print("No context or file provided")
+        else:
+            print("Context is too long, please remove some files you wish to use...")
+
+        return 
+            
+        
+
+# =============================================================================
+#     ### internal use function ### 
+# =============================================================================
+    def _count_tokens_in_history(self, encoding_name="cl100k_base"):
         """
         Calculate the total number of tokens in the chat history.
         Generates a full string from the chat history
@@ -211,10 +305,15 @@ class llm():
         # generate full string from history
         string_total = ''.join([chat["content"] for chat in self.history])
         # compute number of tokens tokens
+        num_tokens = self._count_tokens_from_string(string_total, encoding_name)
+        return num_tokens
+    
+    def _count_tokens_from_string(self, string_total, encoding_name="cl100k_base"):       
+        # compute number of tokens tokens
         encoding = tiktoken.encoding_for_model("gpt-4")
         num_tokens = len(encoding.encode(string_total))
         # add the keys from history in the context length
-        num_tokens += len(self.history)
+        num_tokens += len(self.history)       
         return num_tokens
 
     def _adjust_history_size(self):
@@ -225,7 +324,7 @@ class llm():
         removing the oldest elements until the history size is within the allowed limit.
         """
         # assign first number to enter the while loop
-        number_of_tokens_in_history = self._count_tokens()
+        number_of_tokens_in_history = self._count_tokens_in_history()
         # reduce context if needed
         if number_of_tokens_in_history >= self.max_token_context:
             # in a while loop, until the history is of appropriate size
@@ -286,6 +385,7 @@ class llm():
         try:
             self.history.pop(1)
             self.history.pop(1)
+            print("HISTORY WAS POPED")
         except Exception as e:
             logging.error('Failed to remove second element of history: ' + str(e))
         return
@@ -306,24 +406,45 @@ class llm():
         new_message = {"role": role, "content": content}
         self.history.append(new_message)
         return
+    
+    def _read_py_file(self, file_path):
+        try:
+            with open(file_path, 'r') as file:
+                py_string = file.read()
+            return py_string
+        except FileNotFoundError:
+            return "File not found."
+        except Exception as e:
+            return f"Error occurred while reading the file: {str(e)}"
+        return py_string
 
 
-# %%
-def main():
+# %%   
+if __name__ == "__main__":
     chatbot = llm()
-    chatbot.set_engine("gpt3")
     chatbot.set_engine("gpt4")
 
-    chatbot.set_system_function("coder")
-
-    chatbot.send_receive_message()
-
-    query = "What's the fastest between pandas and spark"
+    chatbot.set_system_function("Python copilot")
+    
+    file_paths = []
+    chatbot.add_context_py_file(file_paths)
+    
+    query = "list all the functions in this project"
+    response = ''
+    for yielded in chatbot.send_receive_message(query):
+        response = response + yielded
+    
+    file_paths = [r'./chatbot_streamlit.py', r'./openia_config.txt', r'./readme.md']
+    chatbot.add_context_py_file(file_paths)
+    
+    aa = chatbot.history
+    
+    query = "list all the functions in this project"
     response = ''
     for yielded in chatbot.send_receive_message(query):
         response = response + yielded
 
-    print('\n--\n')
-    print(response)
-if __name__ == "__main__":
-    main()
+    query = "Tell me what openai key is used in this project"
+    response = ''
+    for yielded in chatbot.send_receive_message(query):
+        response = response + yielded
