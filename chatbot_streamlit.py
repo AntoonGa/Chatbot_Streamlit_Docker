@@ -146,16 +146,15 @@ class llm():
         """
         # add to this dictionnaries different roles that the system can take:)
         hardcoded_systems = {"commenter": """
-        I will provide python functions. 
-        You will provide description headers for these functions. Be concisce. 
-        First interpret what the function do. Then write a short description of the function. 
-        Next in the header write what the arguement and outputs are in the pythonic triple quote format.
-        Also add comment to lines of code that are complicated or use external libraries
+        Are a very high performing coder reviewer.
+        You will be provided with code and you will provide in-context comment for the code.
+        This includes dockstrings, function headers important line comments and Python function formating.
+        When you provide code, make sur it is well delimited from your other sentenses.
         """,
                              "coder": """
         You are a coding assistant for Python developpers. A Python co-pilot !
         You are consice, precice and code at the highest level.
-        You use a wide variety of famous Python package and library.
+        You use a wide variety of famous Python packages and libraries.
         You provide codes with good comments and functions headers indicating the types of output and arguments.
         When you provide code, make sur it is well delimited from your other sentenses.
         """,
@@ -164,10 +163,10 @@ class llm():
         You provide accurate answer to users queries.
         """,
                             "dummy": """
-       We will play a game you and me.
-       You will be a very very stupid IA that believe stupid things.
-       I will ask question and you will answer idiotic things. :)
-       """}
+        We will play a game you and me.
+        You will be a very very stupid IA that believe stupid things.
+        I will ask question and you will answer idiotic things. :)
+        """}
 
         if user_input in hardcoded_systems:
             self.system_function = hardcoded_systems[user_input]
