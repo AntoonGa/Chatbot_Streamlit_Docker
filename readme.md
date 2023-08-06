@@ -4,7 +4,8 @@ This repository contains a chatbot application built using Streamlit and
     can be containerized using Docker.
 	
 ![BotRunningOnStreamLit](./ezgif-3-d6b1e5e52f.gif)
-# Streamlit LLM Chatbot
+# Streamlit LLM copilot
+The system offer difference user mode. Python copilot enables you to load local .py files and places them in context. You can then work on them using the chatbot.
 ## Code Overview
 The code is organized into several functions and a Streamlit application layout.
 ## Streamlit Application
