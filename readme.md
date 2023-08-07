@@ -1,6 +1,10 @@
 This repository contains a chatbot application built using Streamlit and
     OpenAI\'s GPT models. The chatbot can be used for various purposes such as
-    coding assistance, commenting on code, and general conversation. The application
+    coding assistance, commenting on code, and general conversation. 
+    In copilot mode, the chatbot can loadup your Python code and interact with it. It can list functions, provide improvements, find potential weaknesses in the code.
+    This is especially usefull if you work on large scale project.
+    The context memory is handled automatically.
+    The application
     can be containerized using Docker.
 	
 ![BotRunningOnStreamLit](./ezgif-3-d6b1e5e52f.gif)
