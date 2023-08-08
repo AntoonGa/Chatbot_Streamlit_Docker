@@ -8,12 +8,9 @@ TODO:
 This is an issue with streamlit which only remembers filenames and not path (its a security thing)
 So pass the text files I will probably have to load the files/text using streamlit and pass the string to the backend.
 I would rather have the backend do the loading but Im not sure its possible... 
+- Keep working on the speach vs text system which doesnt really atm. The system seems to be confused about whay output to send to the backend.
 - test for stability. Sometime the system hangs, I cannot explain why yet.
-- text display gets it wrong when there is html stuff (' and \ and -)
 - error handling
-- make sure the backend does get the docstring (this one) at the beginning of the file.
-- code factoring. Streamlit is a mess
-- display user question in mini text could be usefull
 - a button to download history json
 - add docstrings to each functions.
 """
@@ -22,32 +19,15 @@ from streamlit_extras.colored_header import colored_header
 from streamlit_extras.add_vertical_space import add_vertical_space
 import chatbot_streamlit as chatbot_streamlit
 import textwrap
-from tempfile import NamedTemporaryFile
 import re
+import time
+from bokeh.models.widgets import Button
+from bokeh.models import CustomJS
+from streamlit_bokeh_events import streamlit_bokeh_events
 
-# FUNCTION DEF #
-def flush_conversation():
-    """
-    Flush the conversation history in the Streamlit session state.
-    This function clears the generated responses, past user inputs, and chatbot history.
-    Everything happens in the llm backend
-    """
-    try:
-        st.session_state['generated'] = [st.session_state['generated'][0]]
-    except:
-        pass
-
-    try:
-        st.session_state['past'] = [st.session_state['past'][0]]
-    except:
-        pass
-
-    try:
-        st.session_state['chatbot'].flush_history()
-    except:
-        pass
-    return
-
+# =============================================================================
+# text formating functions : these should be placed in a custom library
+# =============================================================================
 def separate_text_and_code(text: str) -> tuple:
     """
     Separates text and Python code from a string containing text and code
@@ -112,9 +92,56 @@ def wrap_text(text: str, width: int = 80) -> str:
     wrapped_text = textwrap.fill(text, width=width, replace_whitespace=False)
     return wrapped_text
 
-# Response output
-# Function for taking user prompt as input followed by producing AI generated responses
-# @st.cache_data
+def line_divider():
+    """Stupid function to draw a line because I cant get it to work."""
+    line = ["_" for ii in range(50)]
+    
+    return ''.join(line)
+
+# =============================================================================
+# streamlit control/interactions with the LLM
+# =============================================================================
+def flush_conversation():
+    """
+    Flush the conversation history in the Streamlit session state.
+    This function clears the generated responses, past user inputs, and chatbot history.
+    Everything happens in the llm backend
+    """
+    try:
+        st.session_state['generated'] = [st.session_state['generated'][0]]
+    except:
+        pass
+
+    try:
+        st.session_state['past'] = [st.session_state['past'][0]]
+    except:
+        pass
+
+    try:
+        st.session_state['chatbot'].flush_history()
+    except:
+        pass
+    return
+
+
+def pop_conversation():
+    try:
+        st.session_state['generated'] = st.session_state['generated'][:-1]
+    except:
+        pass
+
+    try:
+        st.session_state['past'] = st.session_state['past'][:-1]
+    except:
+        pass
+
+    try:
+        st.session_state['chatbot']._pop_history()
+    except:
+        pass
+    return
+    
+
 def generate_response(prompt, _chatbot): 
     """
     Generate a response from the chatbot based on the given prompt.
@@ -129,29 +156,6 @@ def generate_response(prompt, _chatbot):
         yield yielded
     return response
 
-# User input
-# Function for taking user provided prompt as input
-def get_text():
-    """
-    Display a text area for user input and a button to clear the text area.
-    :return: str, the user input text
-    """
-    def clear_text():
-        st.session_state["text"] = ""
-        return 
-          
-    input_text = st.text_area("Input", key="text")
-    st.button("clear text input", on_click=clear_text)
-    st.write(input_text)
-    
-    return input_text
-
-def line_divider():
-    """Stupid function to draw a line because I cant get it to work."""
-    line = ["_" for ii in range(80)]
-    
-    return ''.join(line)
-
 def update_context_tokens_display():
     """
     Update the display of context tokens in the Streamlit sidebar.
@@ -160,120 +164,71 @@ def update_context_tokens_display():
     """
     context_tokens = st.session_state['chatbot']._count_tokens_in_history()
     context_tokens_placeholder.write(f"Context tokens: {context_tokens}")
+    return
 
-
-# STREAMLIT HANDLING
-st.set_page_config(page_title="LLM Agent", layout="wide", initial_sidebar_state  = "expanded")
-
-# machine state initalization
-if "init" not in st.session_state:
-    st.session_state['init'] = True
-    st.experimental_rerun()
-else:
-    st.session_state.init = False
-if 'chatbot' not in st.session_state:
-    # instantiate chatbot
-    st.session_state['chatbot'] = chatbot_streamlit.llm()
-# generated stores AI generated responses
-if 'generated' not in st.session_state:
-    # instanciate the chatbot if the sesssion state is empty !
-    st.session_state['generated'] = [""]
-# past stores User's questions
-if 'past' not in st.session_state:
-    st.session_state['past'] = [""]
-# initialize last user input (usefull for some conditions)
-if 'last_user_input' not in st.session_state:
-    st.session_state['last_user_input'] = ''
- 
-
-
-# Sidebar contents
-with st.sidebar:
-    st.title("🤗💬 Antoine chatbot Features:")
-    
-    context_tokens_placeholder = st.empty()
-
-        
-    add_vertical_space(2)
-    option_engine = st.selectbox(
-        'Engine',
-        ('gpt4', 'gpt3'))
-    if 'chatbot' in st.session_state and st.session_state['chatbot'].engine != option_engine:
-        st.session_state['chatbot'].set_engine(option_engine)
-        st.write(st.session_state['chatbot'].engine)
-
-    add_vertical_space(2)
-    option_system = st.selectbox(
-        'System function',
-        ('coder', 'commenter', 'chatbot', "dummy", "Python copilot"))
-    if 'chatbot' in st.session_state and st.session_state['chatbot'].system_function != option_system:
-        st.session_state['chatbot'].set_system_function(option_system)
-        st.write(st.session_state['chatbot'].system_function) 
-        
-    add_vertical_space(2)
-    if st.button('Flush memory'):
-        if 'chatbot' in st.session_state:
-            st.write('Flushed')  # displayed when the button is clicked
-            flush_conversation()
-            
-    # uploader. This makes a list of paths to load.
-    uploaded_files = st.file_uploader("File upload", type='py', accept_multiple_files= True)    
-    if uploaded_files:
-        full_paths = []
-        st.session_state["file_paths"] = []
-        for uploaded_file in uploaded_files:
-            with NamedTemporaryFile(dir='.', suffix='.py') as f:
-                f.write(uploaded_file.getbuffer())
-                path = f.name.split('\\')
-                path.pop(-1)
-                full_path = '\\'.join(path) + '\\' + uploaded_file.name
-                
-                if full_path not in full_paths:
-                    full_paths.append(full_path)
-                
-        st.session_state["file_paths"] = full_paths
-    else:
-        st.session_state["file_paths"] = []
-
-    # send the file_paths to the chatbot
+def set_file_paths(user_paths):
+    if not user_paths: pass
+     
+    user_paths = user_paths.split('\n')
+    user_paths = [user_path.replace('"', '') for user_path in user_paths]
+    # send the file_paths to the chatbot. This appends in the main loop and is always updated
     if st.session_state['chatbot'].system_role == "Python copilot":
-        if "file_paths" in st.session_state:
-            st.session_state['chatbot'].add_context_py_file(st.session_state["file_paths"])
-            print(*st.session_state["file_paths"])  
-  
-         
+        st.session_state["file_paths"] = user_paths
+        st.session_state['chatbot'].add_context_py_file(st.session_state["file_paths"])
+        print(*st.session_state["file_paths"])  
 
+    pass
 
+# =============================================================================
+# Streamlit front end functions
+# =============================================================================
+def fetch_text():
+    """
+    Display a text area for user input and a button to clear the text area.
+    :return: str, the user input text
+    """
+    input_text = st.text_area("Input", key="text")
+    if input_text != st.session_state["last_user_input"] and input_text != st.session_state["text_input"]:  
+        st.session_state["text_input_timestamp"] = time.time()
+        return input_text
+    else:
+        return st.session_state["text_input"]
 
-# Layout of input/response containers
-input_container = st.container()
-colored_header(label='', description='', color_name='blue-30')
-response_container = st.container()
+# second function for user input (paths)
+def get_text_paths():
+    """
+    Display a text area for user input and a button to clear the text area.
+    :return: str, the user input text
+    """
+    def clear_text():
+        st.session_state["text"] = ""
+        return
 
-# Applying the user input box
-with input_container:
-    user_input = get_text()
+    input_text = st.text_area("Input path (separate by line breaks)", key="paths")
+    # st.write(input_text)
+    return input_text 
 
-
-# Conditional display of AI generated responses as a function of user provided prompts
-with response_container:
-    if user_input and user_input != st.session_state['last_user_input']:
-        
-        
+def display_response():
+    # only get in touch with the llm if the user has inputed something new
+    if st.session_state["user_input"] and st.session_state["user_input"] != st.session_state['last_user_input']:    
         # append a new instance of user question and answer
         st.session_state["generated"].append("")
-        st.session_state['past'].append(user_input)
+        st.session_state['past'].append(st.session_state["user_input"])                  
+        # save the new user input for the if statement
+        st.session_state['last_user_input'] = st.session_state["user_input"]
         
         #get the chatbot response and place in st.session_state["generated"]
-        response_generator = generate_response(user_input, st.session_state['chatbot'])
+        response_generator = generate_response(st.session_state["user_input"], st.session_state['chatbot'])
         st.session_state["generated"][-1] = ''.join(response_generator) 
-        
+    
+    # display if there is something to display.
+    if len(st.session_state["generated"]) > 1:
         #create empty response_placeholders
         response_placeholders = []
         for _ in range(len(st.session_state["generated"])):
             response_placeholders.append(st.empty())
             
-
+    
         #read chatbot messages and display in REVERSE order
         nb_of_exchanges = len(st.session_state["generated"])
         for ii in range(0, nb_of_exchanges):
@@ -296,7 +251,7 @@ with response_container:
                             wrapped_text = wrap_text(segment.strip())
                             response_content += f"{wrapped_text}\n"
                     # Add horizontal line to separate chatbot responses displays
-                    response_content += line_divider()
+                    response_content += '\n' + line_divider()
                     #display last response
                     response_placeholders[nb_of_exchanges-ii-1].markdown(response_content)
                     
@@ -304,9 +259,178 @@ with response_container:
                     pass
             else:
                 pass
-            
-        # save the new user input for the if statement
-        st.session_state['last_user_input'] = user_input
 
-#update tokens context count
-update_context_tokens_display()
+        
+
+
+# =============================================================================
+# SESSION STATE INIT
+# =============================================================================
+st.set_page_config(layout="wide")
+if "init" not in st.session_state:
+    st.session_state['init'] = True
+    st.experimental_rerun()   
+if 'chatbot' not in st.session_state:
+    st.session_state['chatbot'] = chatbot_streamlit.llm()
+    
+if 'generated' not in st.session_state:
+    st.session_state['generated'] = [""]
+if 'past' not in st.session_state:
+    st.session_state['past'] = [""]
+    
+if 'file_paths' not in st.session_state:
+    st.session_state["file_paths"] = []  
+    
+if 'last_user_input' not in st.session_state:
+    st.session_state['last_user_input'] = ''
+if "user_input" not in st.session_state:   
+    st.session_state["user_input"] = ''
+if "speech_input" not in st.session_state:
+    st.session_state["speech_input"] = ""
+if "text_input" not in st.session_state:
+    st.session_state["text_input"] = ""
+    
+if "speech_input_timestamp" not in st.session_state:
+    st.session_state["speech_input_timestamp"] = 0
+if "text_input_timestamp" not in st.session_state:
+    st.session_state["text_input_timestamp"] = 0
+
+    
+else:
+    st.session_state.init = False
+
+
+
+# =============================================================================
+# SIDEBAR CONTENT
+# =============================================================================
+with st.sidebar:
+    st.title("🤗💬 Antoine chatbot Features:")
+    
+    # displays the number of tokens in the context
+    context_tokens_placeholder = st.empty()
+    
+    # speech to text button
+    stt_button = Button(label="Speak", width=4)  
+    stt_button.js_on_event("button_click", CustomJS(code="""
+        var recognition = new webkitSpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+    
+        recognition.onresult = function (e) {
+            var value = "";
+            for (var i = e.resultIndex; i < e.results.length; ++i) {
+                if (e.results[i].isFinal) {
+                    value += e.results[i][0].transcript;
+                }
+            }
+            if ( value != "") {
+                document.dispatchEvent(new CustomEvent("GET_TEXT", {detail: value}));
+            }
+        }
+    
+        recognition.start();
+    
+        function stopRecognition() {
+            recognition.stop();
+        }
+    
+        document.addEventListener('mouseup', stopRecognition);
+        document.addEventListener('touchend', stopRecognition);
+    """))  
+    
+    result = streamlit_bokeh_events(
+        stt_button,
+        events="GET_TEXT",
+        key="listen",
+        refresh_on_update=False,
+        override_height=40,
+        debounce_time=0)      
+
+    # select the llm engine   
+    add_vertical_space(2)
+    option_engine = st.selectbox(
+        'Engine',
+        ('gpt4', 'gpt3'))
+    if 'chatbot' in st.session_state and st.session_state['chatbot'].engine != option_engine:
+        st.session_state['chatbot'].set_engine(option_engine)
+        st.write(st.session_state['chatbot'].engine)
+
+    # select the llm function
+    add_vertical_space(2)
+    option_system = st.selectbox(
+        'System function',
+        ("Python copilot", 'coder', 'commenter', 'chatbot', "dummy"))
+    if 'chatbot' in st.session_state and st.session_state['chatbot'].system_function != option_system:
+        st.session_state['chatbot'].set_system_function(option_system)
+        st.write(st.session_state['chatbot'].system_function) 
+     
+    # delete history
+    add_vertical_space(2)
+    if st.button('Flush memory'):
+        if 'chatbot' in st.session_state:
+            st.write('Flushed')  # displayed when the button is clicked
+            flush_conversation()            
+    # pop history
+    if st.button('Pop memory'):
+        if 'chatbot' in st.session_state:
+            st.write('Poped')  # displayed when the button is clicked
+            pop_conversation()
+            
+
+         
+
+# =============================================================================
+# Layout of input/response containers
+# =============================================================================
+input_container = st.container()
+colored_header(label='', description='', color_name='blue-30')
+response_container = st.container()
+
+with input_container:
+    
+    # path input for files
+    user_paths = get_text_paths()
+    set_file_paths(user_paths)
+    # update context
+    update_context_tokens_display()
+    
+    # Applying the user input box     
+    st.session_state["text_input"] = fetch_text()
+    
+     
+
+        
+    
+
+    
+    if result:
+        if "GET_TEXT" in result:
+           new_speech_input = result.get("GET_TEXT")
+           if new_speech_input != st.session_state["speech_input"] and new_speech_input != st.session_state["last_user_input"]:
+               st.session_state["speech_input"] = new_speech_input
+               st.session_state["speech_input_timestamp"] = time.time()
+
+
+
+
+    with response_container:   
+        # choose which respond to send, send the last one:
+        if st.session_state["speech_input_timestamp"] >= st.session_state["text_input_timestamp"] :
+            st.session_state["user_input"] = st.session_state['speech_input']
+        else:
+            st.session_state["user_input"] = st.session_state['text_input']
+            
+        if st.session_state["user_input"]:
+            st.write(st.session_state["user_input"] + '\n' + line_divider())
+            display_response()
+
+    
+    
+
+     
+# =============================================================================
+# Conditional display of AI generated responses as a function of user provided prompts
+# =============================================================================
+
+    
